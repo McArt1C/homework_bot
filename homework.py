@@ -28,8 +28,7 @@ HOMEWORK_STATUSES = {
 
 
 def send_message(bot, message):
-    """Отправка сообщения в telegram"""
-
+    """Отправка сообщения в telegram."""
     try:
         bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
         logging.info(f'Бот отправил сообщение {message}')
@@ -38,8 +37,7 @@ def send_message(bot, message):
 
 
 def get_api_answer(current_timestamp):
-    """Получение списка ДЗ, начиная со времени current_timestamp"""
-
+    """Получение списка ДЗ, начиная со времени current_timestamp."""
     timestamp = current_timestamp or int(time.time())
     params = {'from_date': timestamp}
 
@@ -61,7 +59,6 @@ def check_response(response):
 
     При ошибке выдаёт исключение. Если нет ошибок, возвращает список ДЗ
     """
-
     if type(response) != dict:
         error_msg = 'Ответ от API содержит некорректный тип.'
         logging.error(error_msg)
@@ -83,8 +80,7 @@ def check_response(response):
 
 
 def parse_status(homework):
-    """Возвращает строку с информацией о ДЗ и статусе её проверки"""
-
+    """Возвращает строку с информацией о ДЗ и статусе её проверки."""
     homework_name = homework['homework_name']
     homework_status = homework['status']
     verdict = HOMEWORK_STATUSES[homework_status]
@@ -94,7 +90,6 @@ def parse_status(homework):
 
 def check_tokens():
     """Проверка токенов."""
-
     tokens = [PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]
     for token in tokens:
         if token is None:
@@ -104,7 +99,6 @@ def check_tokens():
 
 def main():
     """Основная логика работы бота."""
-
     if not check_tokens():
         logging.critical('Ошибка токена')
     else:

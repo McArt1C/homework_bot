@@ -39,7 +39,7 @@ class Tokens:
 
 @dataclass
 class HW_Response:
-    """Датакласс для проверки результата запроса к API"""
+    """Датакласс для проверки результата запроса к API."""
 
     response: dict
 

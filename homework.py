@@ -1,30 +1,63 @@
-import os
+import sys
 import time
-from dotenv import load_dotenv
-from http import HTTPStatus
+from dataclasses import dataclass
 
 import requests
 import telegram
 
 import app_logger
-
-load_dotenv()
+import settings
 
 logging = app_logger.get_logger(__name__)
 
-PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
-TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
-TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+PRACTICUM_TOKEN = settings.PRACTICUM_TOKEN
+TELEGRAM_TOKEN = settings.TELEGRAM_TOKEN
+TELEGRAM_CHAT_ID = settings.TELEGRAM_CHAT_ID
 
-RETRY_TIME = 600
-ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
-HEADERS = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
 
-HOMEWORK_STATUSES = {
-    'approved': 'Работа проверена: ревьюеру всё понравилось. Ура!',
-    'reviewing': 'Работа взята на проверку ревьюером.',
-    'rejected': 'Работа проверена: у ревьюера есть замечания.'
-}
+@dataclass
+class Tokens:
+    """Содержит в себе токены и логику работы с ними"""
+    practicum_token: str
+    telegram_token: str
+    telegram_chat_id: int
+
+    def check_tokens(self):
+        all_tokens = [
+            self.practicum_token,
+            self.telegram_token,
+            self.telegram_chat_id,
+        ]
+        if all(all_tokens):
+            return True
+        else:
+            logging.critical('Ошибка токена')
+            return False
+
+
+@dataclass
+class HW_Response:
+    response: dict
+
+    def check_response(self):
+        if type(self.response) != dict:
+            error_msg = 'Ответ от API содержит некорректный тип.'
+            logging.error(error_msg)
+            raise TypeError(error_msg)
+        elif 'current_date' and 'homeworks' not in self.response.keys():
+            error_msg = 'В ответе API нет ожидаемых ключей.'
+            logging.error(error_msg)
+            raise ValueError(error_msg)
+        elif type(self.response['homeworks']) != list:
+            error_msg = 'Домашние задания не являются списком.'
+            logging.error(error_msg)
+            raise TypeError(error_msg)
+        elif len(self.response['homeworks']) == 0:
+            error_msg = 'В ответе от API нет новых домашних заданий.'
+            logging.debug(error_msg)
+            raise ValueError(error_msg)
+        homeworks = self.response.get('homeworks')
+        return homeworks
 
 
 def send_message(bot, message):
@@ -41,16 +74,17 @@ def get_api_answer(current_timestamp):
     timestamp = current_timestamp or int(time.time())
     params = {'from_date': timestamp}
 
-    homework_statuses = requests.get(
-        url=ENDPOINT,
-        headers=HEADERS,
+    hw_statuses = requests.get(
+        url=settings.ENDPOINT,
+        headers=settings.HEADERS,
         params=params
     )
 
-    if homework_statuses.status_code == HTTPStatus.OK:
-        return homework_statuses.json()
+    status_code = hw_statuses.status_code
+    if status_code == requests.codes.ok:
+        return hw_statuses.json()
     else:
-        logging.error('Ресурс недоступен')
+        logging.error(f'Ресурс недоступен, причина: {hw_statuses.reason}')
         raise ValueError('Ответ не был получен')
 
 
@@ -59,53 +93,34 @@ def check_response(response):
 
     При ошибке выдаёт исключение. Если нет ошибок, возвращает список ДЗ
     """
-    if type(response) != dict:
-        error_msg = 'Ответ от API содержит некорректный тип.'
-        logging.error(error_msg)
-        raise TypeError(error_msg)
-    elif 'current_date' and 'homeworks' not in response.keys():
-        error_msg = 'В ответе API нет ожидаемых ключей.'
-        logging.error(error_msg)
-        raise ValueError(error_msg)
-    elif type(response['homeworks']) != list:
-        error_msg = 'Домашние задания не являются списком.'
-        logging.error(error_msg)
-        raise TypeError(error_msg)
-    elif len(response['homeworks']) == 0:
-        error_msg = 'В ответе от API нет новых домашних заданий.'
-        logging.debug(error_msg)
-        raise ValueError(error_msg)
-    homeworks = response.get('homeworks')
-    return homeworks
+    hw_response = HW_Response(response)
+    return hw_response.check_response()
 
 
 def parse_status(homework):
     """Возвращает строку с информацией о ДЗ и статусе её проверки."""
     homework_name = homework['homework_name']
     homework_status = homework['status']
-    verdict = HOMEWORK_STATUSES[homework_status]
+    verdict = settings.HOMEWORK_STATUSES[homework_status]
 
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
 def check_tokens():
     """Проверка токенов."""
-    tokens = [PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]
-    for token in tokens:
-        if token is None:
-            return False
-    return True
+    tokens = Tokens(PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID)
+    return tokens.check_tokens()
 
 
 def main():
     """Основная логика работы бота."""
-    if not check_tokens():
-        logging.critical('Ошибка токена')
-    else:
+    if check_tokens():
         logging.info('Бот запущен')
+    else:
+        sys.exit()
 
     last_error_msg = ''
-    bot = telegram.Bot(token=TELEGRAM_TOKEN)
+    bot = telegram.Bot(token=settings.TELEGRAM_TOKEN)
 
     while True:
         current_timestamp = int(time.time())
@@ -117,7 +132,7 @@ def main():
                 logging.info(f'Бот получил результат {homework}')
                 new_status = parse_status(homework)
                 send_message(bot, new_status)
-            time.sleep(RETRY_TIME)
+            time.sleep(settings.RETRY_TIME)
 
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
@@ -125,7 +140,7 @@ def main():
             if str(error) != last_error_msg:
                 send_message(bot, message)
                 last_error_msg = str(error)
-            time.sleep(RETRY_TIME)
+            time.sleep(settings.RETRY_TIME)
         else:
             logging.info('Бот остановлен')
 

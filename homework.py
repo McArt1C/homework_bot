@@ -17,12 +17,14 @@ TELEGRAM_CHAT_ID = settings.TELEGRAM_CHAT_ID
 
 @dataclass
 class Tokens:
-    """Содержит в себе токены и логику работы с ними"""
+    """Содержит в себе токены и логику работы с ними."""
+
     practicum_token: str
     telegram_token: str
     telegram_chat_id: int
 
     def check_tokens(self):
+        """Проверка токенов."""
         all_tokens = [
             self.practicum_token,
             self.telegram_token,
@@ -37,9 +39,15 @@ class Tokens:
 
 @dataclass
 class HW_Response:
+    """Датакласс для проверки результата запроса к API"""
+
     response: dict
 
     def check_response(self):
+        """Проверка ответа сервера.
+
+        При ошибке выдаёт исключение. Если нет ошибок, возвращает список ДЗ
+        """
         if type(self.response) != dict:
             error_msg = 'Ответ от API содержит некорректный тип.'
             logging.error(error_msg)

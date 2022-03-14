@@ -1,71 +1,18 @@
 import sys
 import time
-from dataclasses import dataclass
 
 import requests
 import telegram
 
 import app_logger
 import settings
+from validation import HWResponse, Tokens
 
 logging = app_logger.get_logger(__name__)
 
 PRACTICUM_TOKEN = settings.PRACTICUM_TOKEN
 TELEGRAM_TOKEN = settings.TELEGRAM_TOKEN
 TELEGRAM_CHAT_ID = settings.TELEGRAM_CHAT_ID
-
-
-@dataclass
-class Tokens:
-    """Содержит в себе токены и логику работы с ними."""
-
-    practicum_token: str
-    telegram_token: str
-    telegram_chat_id: int
-
-    def check_tokens(self):
-        """Проверка токенов."""
-        all_tokens = [
-            self.practicum_token,
-            self.telegram_token,
-            self.telegram_chat_id,
-        ]
-        if all(all_tokens):
-            return True
-        else:
-            logging.critical('Ошибка токена')
-            return False
-
-
-@dataclass
-class HW_Response:
-    """Датакласс для проверки результата запроса к API."""
-
-    response: dict
-
-    def check_response(self):
-        """Проверка ответа сервера.
-
-        При ошибке выдаёт исключение. Если нет ошибок, возвращает список ДЗ
-        """
-        if type(self.response) != dict:
-            error_msg = 'Ответ от API содержит некорректный тип.'
-            logging.error(error_msg)
-            raise TypeError(error_msg)
-        elif 'current_date' and 'homeworks' not in self.response.keys():
-            error_msg = 'В ответе API нет ожидаемых ключей.'
-            logging.error(error_msg)
-            raise ValueError(error_msg)
-        elif type(self.response['homeworks']) != list:
-            error_msg = 'Домашние задания не являются списком.'
-            logging.error(error_msg)
-            raise TypeError(error_msg)
-        elif len(self.response['homeworks']) == 0:
-            error_msg = 'В ответе от API нет новых домашних заданий.'
-            logging.debug(error_msg)
-            raise ValueError(error_msg)
-        homeworks = self.response.get('homeworks')
-        return homeworks
 
 
 def send_message(bot, message):
@@ -101,7 +48,7 @@ def check_response(response):
 
     При ошибке выдаёт исключение. Если нет ошибок, возвращает список ДЗ
     """
-    hw_response = HW_Response(response)
+    hw_response = HWResponse(response)
     return hw_response.check_response()
 
 

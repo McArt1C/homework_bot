@@ -1,2 +1,7 @@
-# homework_bot
-python telegram bot
+# Homework Telegram Bot
+## Бот для проверки статуса домашнего задания и отправки сообщений в случае изменения статуса
+
+### Стек технологий:
+- Модуль logging
+- Библиотека python-telegram-bot
+- Библиотека requests
